@@ -11,6 +11,7 @@ import favoritesRoutes from './routes/favorites.routes.js';
 import bookingsRoutes from './routes/bookings.routes.js';
 import paymentsRoutes from './routes/payments.routes.js';
 import cronRoutes from './routes/cron.routes.js';
+import analyticsRoutes from './routes/analytics.routes.js';
 import { stripeWebhook } from './controllers/payments.controller.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api/favorites', favoritesRoutes);
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/cron', cronRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
