@@ -1,6 +1,7 @@
 import { getDb } from '../lib/db.js';
 import { byEquipmentId } from '../utils/equipmentQuery.js';
 import { validateEquipmentBody } from '../utils/equipmentValidation.js';
+import { startOfTodayUTC } from '../utils/bookingValidation.js';
 import { formatEquipmentDoc } from './equipment.controller.js';
 
 export async function createEquipment(req, res, next) {
@@ -164,13 +165,15 @@ export async function deleteEquipment(req, res, next) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    // 02 §5: Refuse (409) if it has upcoming paid bookings
+    // 02 §5 + audit Y1: refuse (409) if it has upcoming paid bookings.
+    // endDate is stored as a UTC Date, so the comparison must use a Date too —
+    // an ISO string would never match and the guard would silently never fire.
     const eqIdStr = doc._id.toString();
     const hasUpcomingPaidBooking = await db.collection('bookings').findOne({
       $or: [{ equipmentId: doc._id }, { equipmentId: eqIdStr }],
       paymentStatus: 'paid',
       status: { $in: ['pending', 'confirmed'] },
-      endDate: { $gte: new Date().toISOString().slice(0, 10) },
+      endDate: { $gte: startOfTodayUTC() },
     });
 
     if (hasUpcomingPaidBooking) {

@@ -6,8 +6,9 @@ import { errorHandler } from './middlewares/errorHandler.js';
 import usersRoutes from './routes/users.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
 import statsRoutes from './routes/stats.routes.js';
-import adminEquipmentRoutes from './routes/adminEquipment.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import favoritesRoutes from './routes/favorites.routes.js';
+import bookingsRoutes from './routes/bookings.routes.js';
 
 const app = express();
 
@@ -24,8 +25,9 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/users', usersRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/stats', statsRoutes);
-app.use('/api/admin', adminEquipmentRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/favorites', favoritesRoutes);
+app.use('/api/bookings', bookingsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
