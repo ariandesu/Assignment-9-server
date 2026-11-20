@@ -103,6 +103,14 @@ export async function updateMe(req, res) {
     return res.status(400).json({ message: 'No valid fields to update' });
   }
 
+  if (updates.phone && typeof updates.phone === 'string') {
+    const stripped = updates.phone.replace(/[\s-]/g, '');
+    const match = stripped.match(/^(?:\+?880|0)1[3-9]\d{8}$/);
+    if (match) {
+      updates.phone = `+880${stripped.slice(-10)}`;
+    }
+  }
+
   updates.updatedAt = new Date();
   await db.collection('user').updateOne({ _id: userId }, { $set: updates });
 
