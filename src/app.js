@@ -7,6 +7,7 @@ import usersRoutes from './routes/users.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
 import statsRoutes from './routes/stats.routes.js';
 import adminEquipmentRoutes from './routes/adminEquipment.routes.js';
+import favoritesRoutes from './routes/favorites.routes.js';
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use('/api/users', usersRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminEquipmentRoutes);
+app.use('/api/favorites', favoritesRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
