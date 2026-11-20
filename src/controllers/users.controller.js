@@ -1,7 +1,6 @@
 import { getDb } from '../lib/db.js';
+import { byUserId } from '../lib/userQuery.js';
 import { ObjectId } from 'mongodb';
-
-const ALLOWED_UPDATE_FIELDS = ['name', 'image', 'phone', 'address'];
 
 function validateUpdate(body) {
   if (body.name !== undefined) {
@@ -15,18 +14,33 @@ function validateUpdate(body) {
   }
 
   if (body.image !== undefined) {
-    if (body.image !== '' && !/^https?:\/\//.test(body.image)) {
-      return 'image must be a valid http(s) URL';
+    if (typeof body.image !== 'string') {
+      return 'image must be a string';
     }
-    if (body.image.length > 500) {
-      return 'image must be at most 500 characters';
+    const image = body.image.trim();
+    if (image !== '') {
+      let url;
+      try {
+        url = new URL(image);
+      } catch {
+        return 'image must be a valid URL';
+      }
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return 'image must use http: or https: protocol';
+      }
+      if (image.length > 500) {
+        return 'image must be at most 500 characters';
+      }
     }
   }
 
   if (body.phone !== undefined) {
-    if (body.phone !== '') {
-      const stripped = body.phone.replace(/[\s-]/g, '');
-      if (!/^(\+?880)?1[3-9]\d{8}$/.test(stripped)) {
+    if (typeof body.phone !== 'string') {
+      return 'phone must be a string';
+    }
+    const phone = body.phone.replace(/[\s-]/g, '');
+    if (phone !== '') {
+      if (!/^(?:\+?880|0)1[3-9]\d{8}$/.test(phone)) {
         return 'phone must be a valid Bangladesh number';
       }
     }
@@ -47,7 +61,7 @@ function validateUpdate(body) {
 export async function getMe(req, res) {
   const db = await getDb();
   const user = await db.collection('user').findOne(
-    { _id: new ObjectId(req.user.id) },
+    byUserId(req.user.id),
     { projection: { password: 0 } }
   );
 
@@ -58,13 +72,13 @@ export async function getMe(req, res) {
   res.json({
     data: {
       id: user._id.toString(),
-      name: user.name,
-      email: user.email,
-      image: user.image,
-      role: user.role,
-      phone: user.phone,
-      address: user.address,
-      createdAt: user.createdAt,
+      name: user.name || '',
+      email: user.email || '',
+      image: user.image || null,
+      role: user.role || '',
+      phone: user.phone || '',
+      address: user.address || '',
+      createdAt: user.createdAt || null,
     },
   });
 }
@@ -76,12 +90,12 @@ export async function updateMe(req, res) {
   }
 
   const db = await getDb();
-  const userId = new ObjectId(req.user.id);
+  const userId = new ObjectId(byUserId(req.user.id)._id);
 
   const updates = {};
-  for (const field of ALLOWED_UPDATE_FIELDS) {
+  for (const field of ['name', 'image', 'phone', 'address']) {
     if (req.body[field] !== undefined) {
-      updates[field] = req.body[field];
+      updates[field] = req.body[field].trim();
     }
   }
 
@@ -96,13 +110,13 @@ export async function updateMe(req, res) {
   res.json({
     data: {
       id: updated._id.toString(),
-      email: updated.email,
-      role: updated.role,
-      name: updated.name,
-      image: updated.image,
-      phone: updated.phone,
-      address: updated.address,
-      createdAt: updated.createdAt,
+      email: updated.email || '',
+      role: updated.role || '',
+      name: updated.name || '',
+      image: updated.image || null,
+      phone: updated.phone || '',
+      address: updated.address || '',
+      createdAt: updated.createdAt || null,
     },
   });
 }

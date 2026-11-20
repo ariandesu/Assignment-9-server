@@ -1,5 +1,5 @@
 import { getDb } from '../lib/db.js';
-import { ObjectId } from 'mongodb';
+import { byUserId } from '../lib/userQuery.js';
 import jwt from 'jsonwebtoken';
 
 function getAuthConfig() {
@@ -40,13 +40,7 @@ export async function verifyToken(req, res, next) {
     const db = await getDb();
     const userId = decoded.sub;
 
-    // Handle both ObjectId and string ids — check what BetterAuth stored
-    let user;
-    if (ObjectId.isValid(userId)) {
-      user = await db.collection('user').findOne({ _id: new ObjectId(userId) });
-    } else {
-      user = await db.collection('user').findOne({ _id: userId });
-    }
+    const user = await db.collection('user').findOne(byUserId(userId));
 
     if (!user) {
       return res.status(401).json({ message: 'Unauthorized' });
