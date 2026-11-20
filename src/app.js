@@ -3,6 +3,7 @@ import cors from 'cors';
 import { corsOptions } from './lib/cors.js';
 import { notFound } from './middlewares/notFound.js';
 import { errorHandler } from './middlewares/errorHandler.js';
+import usersRoutes from './routes/users.routes.js';
 
 const app = express();
 
@@ -15,6 +16,8 @@ app.use(express.json());
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
+
+app.use('/api/users', usersRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
