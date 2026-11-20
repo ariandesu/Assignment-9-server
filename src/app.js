@@ -9,11 +9,13 @@ import statsRoutes from './routes/stats.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import favoritesRoutes from './routes/favorites.routes.js';
 import bookingsRoutes from './routes/bookings.routes.js';
+import paymentsRoutes from './routes/payments.routes.js';
+import { stripeWebhook } from './controllers/payments.controller.js';
 
 const app = express();
 
 // The Stripe webhook must read the raw body, so it mounts before express.json().
-// Route added in S-10; keep this ordering intact.
+app.post('/api/payments/webhook', express.raw({ type: 'application/json' }), stripeWebhook);
 
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -28,6 +30,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/bookings', bookingsRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
