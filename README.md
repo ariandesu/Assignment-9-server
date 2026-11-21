@@ -7,7 +7,8 @@ Express 5 with the MongoDB native driver, JWT authorization issued by the Next.j
 client's BetterAuth session, and Stripe Checkout for payments. Runs as a normal
 long-lived Node process locally and as a Vercel serverless function in production.
 
-- **Live URL:** _pending deployment (task S-15)_
+- **Live URL:** https://equipra-server.vercel.app
+- **Client:** https://equipra-client.vercel.app
 - **Client repo:** https://github.com/ariandesu/Assignment-9-frontend
 - **Database:** MongoDB Atlas
 
