@@ -26,6 +26,18 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true });
 });
 
+const apiInfo = {
+  data: { name: 'Equipra API', status: 'ok', docs: 'see README' },
+};
+
+app.get('/', (_req, res) => {
+  res.status(200).json(apiInfo);
+});
+
+app.get('/api', (_req, res) => {
+  res.status(200).json(apiInfo);
+});
+
 app.use('/api/users', usersRoutes);
 app.use('/api/equipment', equipmentRoutes);
 app.use('/api/stats', statsRoutes);
