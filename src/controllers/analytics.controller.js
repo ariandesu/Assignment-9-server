@@ -29,63 +29,85 @@ function monthlyPaidPipeline(match, sumField) {
   ];
 }
 
+// Shared month bucket for the payments collection. Stripe stores minor units,
+// so the summed field comes back in BDT. Handlers supply their own $match
+// chain (admin: window only; owner: window plus a booking join on owner id,
+// never ownerEmail) and read the summed field off each row.
+export function monthlyPaymentsPipeline(stages, sumField) {
+  return [
+    ...stages,
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m', date: '$createdAt', timezone: 'UTC' } },
+        [sumField]: { $sum: { $divide: ['$amount', 100] } },
+      },
+    },
+  ];
+}
+
+// Scopes payments to one owner through their bookings. Emails can change,
+// so the join matches the immutable booking owner id.
+export function ownerPaymentScope(ownerId) {
+  return [
+    { $lookup: { from: 'bookings', localField: 'bookingId', foreignField: '_id', as: 'booking' } },
+    { $unwind: '$booking' },
+    { $match: { 'booking.owner.id': ownerId } },
+  ];
+}
+
 export async function getAdminAnalytics(req, res, next) {
   try {
     const db = await getDb();
     const months = lastSixMonths();
     const windowStart = startOfMonthUTC(months[0]);
 
-    const [counts, monthlyRows, revenueRows, totalUsers] = await Promise.all([
+    const [counts, monthlyBookingRows, bookingStats, revenueData, totalUsers] = await Promise.all([
       db.collection('equipment').aggregate([
-        {
-          $facet: {
+        { $facet: {
             equipment: [{ $count: 'n' }],
             pending: [{ $match: { status: 'pending' } }, { $count: 'n' }],
-          },
-        },
+        } },
       ]).toArray(),
       db.collection('bookings').aggregate(monthlyPaidPipeline(
-        { paymentStatus: 'paid', createdAt: { $gte: windowStart } },
-        'revenue'
-      )).toArray(),
+        { paymentStatus: 'paid', createdAt: { $gte: windowStart } }, 'revenue')).toArray(),
       db.collection('bookings').aggregate([
-        {
-          $facet: {
-            totalRevenue: [
-              { $match: { paymentStatus: 'paid' } },
-              { $group: { _id: null, total: { $sum: '$totalAmount' } } },
-            ],
-            completedRentals: [
-              { $match: { status: 'completed' } },
-              { $count: 'n' },
-            ],
+        { $facet: {
+            completedRentals: [{ $match: { status: 'completed' } }, { $count: 'n' }],
             totalBookings: [{ $count: 'n' }],
-          },
-        },
+        } },
+      ]).toArray(),
+      db.collection('payments').aggregate([
+        { $match: { status: 'paid' } },
+        { $facet: {
+            total: [{ $group: { _id: null, total: { $sum: { $divide: ['$amount', 100] } } } }],
+            rows: [{ $match: { createdAt: { $gte: windowStart } } }, ...monthlyPaymentsPipeline([], 'revenue')],
+        } },
       ]).toArray(),
       db.collection('user').countDocuments(),
     ]);
 
     const facets = counts[0] || {};
-    const revenueFacet = revenueRows[0] || {};
+    const bookingFacet = bookingStats[0] || {};
+    const revenue = revenueData[0] || {};
 
     const monthlyMap = new Map(months.map((month) => [month, { month, bookings: 0, revenue: 0 }]));
-    for (const row of monthlyRows) {
+    for (const row of monthlyBookingRows) {
       const target = monthlyMap.get(row._id);
-      if (target) {
-        target.bookings = row.bookings;
-        target.revenue = row.revenue || 0;
-      }
+      if (target) target.bookings = row.bookings;
+    }
+    for (const row of revenue.rows || []) {
+      const target = monthlyMap.get(row._id);
+      if (target) target.revenue = row.revenue || 0;
     }
 
     res.json({
       data: {
         totalUsers,
         totalEquipment: facets.equipment?.[0]?.n ?? 0,
-        totalBookings: revenueFacet.totalBookings?.[0]?.n ?? 0,
+        totalBookings: bookingFacet.totalBookings?.[0]?.n ?? 0,
         pendingApprovals: facets.pending?.[0]?.n ?? 0,
-        completedRentals: revenueFacet.completedRentals?.[0]?.n ?? 0,
-        totalRevenue: revenueFacet.totalRevenue?.[0]?.total ?? 0,
+        completedRentals: bookingFacet.completedRentals?.[0]?.n ?? 0,
+        totalRevenue: revenue.total?.[0]?.total ?? 0,
         monthly: months.map((month) => monthlyMap.get(month)),
       },
     });
@@ -102,51 +124,37 @@ export async function getOwnerAnalytics(req, res, next) {
     const windowStart = startOfMonthUTC(months[0]);
     const thisMonthStart = startOfMonthUTC(months[months.length - 1]);
 
-    const [equipmentFacet, bookingFacet, monthlyRows] = await Promise.all([
+    const [equipmentFacet, bookingFacet, paymentData] = await Promise.all([
       db.collection('equipment').aggregate([
         { $match: { 'owner.id': ownerId } },
-        {
-          $facet: {
+        { $facet: {
             listed: [{ $count: 'n' }],
             approved: [{ $match: { status: 'approved' } }, { $count: 'n' }],
             pending: [{ $match: { status: 'pending' } }, { $count: 'n' }],
             rejected: [{ $match: { status: 'rejected' } }, { $count: 'n' }],
-          },
-        },
+        } },
       ]).toArray(),
       db.collection('bookings').aggregate([
         { $match: { 'owner.id': ownerId } },
-        {
-          $facet: {
+        { $facet: {
             completedRentals: [{ $match: { status: 'completed' } }, { $count: 'n' }],
-            paid: [
-              { $match: { paymentStatus: 'paid' } },
-              {
-                $group: {
-                  _id: null,
-                  totalEarnings: { $sum: '$totalAmount' },
-                  thisMonth: {
-                    $sum: {
-                      $cond: [{ $gte: ['$createdAt', thisMonthStart] }, '$totalAmount', 0],
-                    },
-                  },
-                },
-              },
-            ],
             statusMix: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
             total: [{ $count: 'n' }],
-          },
-        },
+        } },
       ]).toArray(),
-      db.collection('bookings').aggregate(monthlyPaidPipeline(
-        { 'owner.id': ownerId, paymentStatus: 'paid', createdAt: { $gte: windowStart } },
-        'earnings'
-      )).toArray(),
+      db.collection('payments').aggregate([
+        { $match: { status: 'paid' } },
+        ...ownerPaymentScope(ownerId),
+        { $facet: {
+            totals: [{ $group: { _id: null, totalEarnings: { $sum: { $divide: ['$amount', 100] } }, thisMonth: { $sum: { $cond: [{ $gte: ['$createdAt', thisMonthStart] }, { $divide: ['$amount', 100] }, 0] } } } }],
+            rows: [{ $match: { createdAt: { $gte: windowStart } } }, ...monthlyPaymentsPipeline([], 'earnings')],
+        } },
+      ]).toArray(),
     ]);
 
     const eq = equipmentFacet[0] || {};
     const bk = bookingFacet[0] || {};
-    const paid = bk.paid?.[0] || {};
+    const paid = (paymentData[0] || {}).totals?.[0] || {};
     const totalBookings = bk.total?.[0]?.n ?? 0;
 
     const mixMap = new Map((bk.statusMix || []).map((row) => [row._id, row.count]));
@@ -160,7 +168,7 @@ export async function getOwnerAnalytics(req, res, next) {
     });
 
     const monthlyMap = new Map(months.map((month) => [month, { month, earnings: 0 }]));
-    for (const row of monthlyRows) {
+    for (const row of (paymentData[0] || {}).rows || []) {
       const target = monthlyMap.get(row._id);
       if (target) target.earnings = row.earnings || 0;
     }

@@ -24,7 +24,7 @@ long-lived Node process locally and as a Vercel serverless function in productio
   reservation hold before payment.
 - Stripe Checkout in BDT with a signature-verified webhook and one idempotent
   `confirmBooking` shared by `/payments/confirm` and the webhook.
-- Analytics for the admin and owner dashboards via MongoDB aggregation pipelines.
+- Analytics for the admin and owner dashboards via MongoDB aggregation pipelines (revenue and earnings come from the payments collection).
 - Scheduled housekeeping: completes finished paid bookings and cancels expired
   unpaid holds.
 
