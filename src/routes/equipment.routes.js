@@ -3,6 +3,7 @@ import {
   listPublicEquipment,
   getFeaturedEquipment,
   getCategoryCounts,
+  getEquipmentAvailability,
 } from '../controllers/equipment.controller.js';
 import {
   createEquipment,
@@ -28,6 +29,7 @@ router.get('/mine/list', verifyToken, verifyOwner, getMyEquipmentList);
 
 // Item routes
 router.get('/:id', verifyToken, getEquipmentById);
+router.get('/:id/availability', verifyToken, getEquipmentAvailability);
 router.patch('/:id', verifyToken, verifyOwnerOrAdmin, updateEquipment);
 router.delete('/:id', verifyToken, verifyOwnerOrAdmin, deleteEquipment);
 

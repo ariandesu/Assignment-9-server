@@ -1,4 +1,8 @@
+import { ObjectId } from 'mongodb';
 import { getDb } from '../lib/db.js';
+import { byEquipmentId } from '../utils/equipmentQuery.js';
+import { getAvailableQuantity } from '../utils/availability.js';
+import { parseBookingDates } from '../utils/bookingValidation.js';
 
 export const STANDARD_CATEGORIES = [
   'Construction Equipment',
@@ -150,6 +154,41 @@ export async function getCategoryCounts(req, res, next) {
     }));
 
     res.json({ data });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getEquipmentAvailability(req, res, next) {
+  try {
+    if (!ObjectId.isValid(String(req.params.id))) {
+      return res.status(400).json({ message: 'A valid equipment id is required' });
+    }
+
+    const dates = parseBookingDates(req.query.start, req.query.end);
+    if (dates.error) {
+      return res.status(400).json({ message: dates.error });
+    }
+
+    const db = await getDb();
+    const doc = await db.collection('equipment').findOne(byEquipmentId(req.params.id));
+
+    if (!doc) {
+      return res.status(404).json({ message: 'Equipment not found' });
+    }
+
+    // Same visibility as getEquipmentById: approved -> anyone logged in;
+    // pending/rejected -> only its owner or admin.
+    if (doc.status !== 'approved') {
+      const isOwner = doc.owner?.id === req.user?.id;
+      const isAdmin = req.user?.role === 'admin';
+      if (!isOwner && !isAdmin) {
+        return res.status(404).json({ message: 'Equipment not found' });
+      }
+    }
+
+    const available = await getAvailableQuantity(db, doc, dates.startDate, dates.endDate);
+    res.json({ data: { available, total: Number(doc.quantity) || 0 } });
   } catch (err) {
     next(err);
   }

@@ -58,6 +58,23 @@ export function paginate(rows, params = {}) {
   };
 }
 
+// Validates a booking date range on its own: both dates present and parseable,
+// start >= today (UTC), end >= start. Returns { error } or the parsed dates.
+export function parseBookingDates(startDate, endDate) {
+  const start = parseDateOnly(startDate);
+  const end = parseDateOnly(endDate);
+  if (!start || !end) {
+    return { error: 'Start and end dates are required' };
+  }
+  if (start < startOfTodayUTC()) {
+    return { error: 'Start date must not be in the past' };
+  }
+  if (end < start) {
+    return { error: 'End date must not be before the start date' };
+  }
+  return { startDate: start, endDate: end };
+}
+
 // Validates the booking body exactly like the mock source and 02 §5:
 // start >= today (UTC), end >= start, quantity is an integer, BD phone, address.
 // Returns { error } with the first failure, or the parsed values.
@@ -67,17 +84,11 @@ export function validateBookingInput(body = {}) {
     return { error: 'Quantity must be a whole number of at least 1' };
   }
 
-  const startDate = parseDateOnly(body.startDate);
-  const endDate = parseDateOnly(body.endDate);
-  if (!startDate || !endDate) {
-    return { error: 'Start and end dates are required' };
+  const dates = parseBookingDates(body.startDate, body.endDate);
+  if (dates.error) {
+    return { error: dates.error };
   }
-  if (startDate < startOfTodayUTC()) {
-    return { error: 'Start date must not be in the past' };
-  }
-  if (endDate < startDate) {
-    return { error: 'End date must not be before the start date' };
-  }
+  const { startDate, endDate } = dates;
 
   const phone = normalisePhone(body.phone);
   if (!phone) {
