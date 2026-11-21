@@ -52,7 +52,8 @@ export async function createCheckoutSession(req, res, next) {
     // 01 decision 4: BDT, amount taken from the booking in the database.
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
-      payment_method_types: ['card'],
+      // Payment methods come from the Stripe Dashboard; the API rejects
+      // payment_method_types on Checkout Sessions.
       line_items: [
         {
           quantity: 1,
